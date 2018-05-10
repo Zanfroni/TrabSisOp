@@ -326,9 +326,6 @@ public class Escalonador{
         printProcess.add("-");
         printIO.add("X");
         noMultiContext = true;
-        // testing shit
-        System.out.println();
-        System.out.println(execTime);
     }
     
     //Versão para quando há IO (com mudanças). Provavelmente o método mais volátil do código
