@@ -120,19 +120,26 @@ public class Escalonador{
         if(recursionQuit == 0) return;
         
         if(!preemp){
-            //ver se tem availableprocess
+            if(!availableProcess.isEmpty()){
             
-            comparePriority();
-            if(preemp) runRepeat();
-            /*else if(!currentProcess.getIOTimeList().isEmpty()){
-           //ver tempo que foi executado <=, getfirst, removefirst, quando entrar, retira e mete um run com o priority
-            }*/
-            else if(currentProcess.getSlice() == 0){
-                currentProcess.fillSlice(slice);
-                runRepeat();
+                comparePriority();
+                if(preemp) runRepeat();
+                /*else if(!currentProcess.getIOTimeList().isEmpty()){
+                //ver tempo que foi executado <=, getfirst, removefirst, quando entrar, retira e mete um run com o priority
+                }*/
+                else if(currentProcess.getSlice() == 0){
+                    currentProcess.fillSlice(slice);
+                    runRepeat();
+                }
+                else{
+                    runStep();
+                    runRepeat();
+                }
             }
             else{
-                runStep();
+                noProcessPrint();
+                searchProcess();
+                execTime++;
                 runRepeat();
             }
         }
