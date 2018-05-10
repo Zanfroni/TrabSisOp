@@ -23,6 +23,10 @@ public class Processo {
     	IOTimeList = new LinkedList<>();
     }
     
+    public String getId(){
+        return id;
+    }
+    
     public void insertIOTime(int n){
     	IOTimeList.add(n);
         Collections.sort(IOTimeList);
@@ -66,6 +70,10 @@ public class Processo {
     public void fillSlice(int n){
         sliceTime = n;
         setRR();
+    }
+    
+    public void reduceSlice(){
+        sliceTime--;
     }
     
     public int getSlice(){

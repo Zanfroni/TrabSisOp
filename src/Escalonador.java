@@ -18,8 +18,8 @@ import java.util.Collections;
 public class Escalonador{
 
     private Processo[] procs;
-    private int slice, nextArrival, execTime;
-    private boolean preemp = false;
+    private int slice, nextArrival, execTime, recursionQuit;
+    private boolean preemp = false, noMultiContext = false;
     private LinkedList<Integer> sortedArrivalTime, sortedIOTime;
     private LinkedList<String> printProcess, printIO;
     private LinkedList<Processo> availableProcess, roundRobinEffect;
@@ -32,6 +32,7 @@ public class Escalonador{
         availableProcess = new LinkedList<>();
         roundRobinEffect = new LinkedList<>();
         execTime = 1;
+        currentProcess = null;
     }
     
     // SE USAR RECURSÃO, APAGAR O SLICETIME DOS PROCESSOS!!!!**********************
@@ -46,6 +47,7 @@ public class Escalonador{
         line = in.readLine();
         procs = new Processo[Integer.parseInt(line)];
         if(procs.length == 0) shutdown(); //Caso não exista nenhum
+        recursionQuit = Integer.parseInt(line);
         
         //Aqui, lê-se a partição
         line = in.readLine();
@@ -97,38 +99,71 @@ public class Escalonador{
         //Execução padrão quando ninguém tem arrivalTime = 1
         if(execTime < nextArrival){
             noProcessPrint();
-            printProcess.add("T");
-            printIO.add("X");
             searchProcess();
             execTime++;
         }
+        else{
+            searchProcess();
+            comparePriority();
+            printProcess.add(currentProcess.getId());
+            printIO.add("X");
+            execTime++;
+        }
         
-        searchProcess();
         //Inicia a recursão
         runRepeat();
+        print();
     }
     
     private void runRepeat(){
+        
+        if(recursionQuit == 0) return;
+        
         if(!preemp){
+            //ver se tem availableprocess
+            
             comparePriority();
-
-            if(!currentProcess.getIOTimeList().isEmpty()){
-           //ver tempo que foi executado <=
-            }
+            if(preemp) runRepeat();
+            /*else if(!currentProcess.getIOTimeList().isEmpty()){
+           //ver tempo que foi executado <=, getfirst, removefirst, quando entrar, retira e mete um run com o priority
+            }*/
             else if(currentProcess.getSlice() == 0){
                 currentProcess.fillSlice(slice);
+                runRepeat();
             }
             else{
                 runStep();
+                runRepeat();
             }
         }
         else{
-            //executar a porra da troca
+            if(noMultiContext){
+                printProcess.add("T");
+                printIO.add("X");
+                if(nextArrival != -1 && execTime == nextArrival) searchProcess();
+                execTime++;
+                noMultiContext = false;
+            }
+            preemp = false;
+            runRepeat();
         }
     }
     
     private void runStep(){
-        
+        currentProcess.executeSecond();
+        currentProcess.reduceSlice();
+        printProcess.add(currentProcess.getId());
+        printIO.add("X");
+        if(nextArrival != -1 && execTime == nextArrival) searchProcess();
+        execTime++;
+        noMultiContext = true;
+        if(currentProcess.getExecutedTime() == currentProcess.getExecutionTime()){
+            availableProcess.remove(currentProcess);
+            currentProcess = null;
+            comparePriority();
+            preemp = true;
+            recursionQuit--;
+        }
     }
     
     private void comparePriority(){
@@ -158,11 +193,10 @@ public class Escalonador{
             }
             resetCondition--;
             if(resetCondition == 0){
-                for(int j = 0; j < roundRobinEffect.size(); j++){
-                    roundRobinEffect.get(j).desetRR();
-                }
+                for(int j = 0; j < roundRobinEffect.size(); j++) roundRobinEffect.get(j).desetRR();
                 //Se ele reiniciar o rodízio, ele parte de volta do primeiro valor
                 currentProcess = roundRobinEffect.get(0);
+                preemp = true;
             }
         }
         
@@ -173,15 +207,18 @@ public class Escalonador{
     //se der uns exception, pode ser aqui o problema
     private void searchProcess(){
         for(int i = 0; i < procs.length; i++){
-            if(procs[i].getArrivalTime() == nextArrival) availableProcess.add(procs[i]);
+            if(procs[i].getArrivalTime() == nextArrival){
+                availableProcess.add(procs[i]);
+                System.out.println("asdasdsadasd " + execTime + " " + nextArrival + " " + procs[i].getArrivalTime());
+            }
         }
         //Remove duplicatas do tempo de chegada
-        int oldArrival = nextArrival;
         //Esta condição só é atingida quando não existir mais tempo de chegada, tornando nextArrival dispensável.
-        if(sortedArrivalTime.isEmpty()){
+        if(sortedArrivalTime.isEmpty() || availableProcess.size() == procs.length){
             nextArrival = -1;
             return;
         }
+        int oldArrival = nextArrival;
         while(nextArrival == oldArrival){
             nextArrival = sortedArrivalTime.removeFirst();
             if(sortedArrivalTime.isEmpty()) return;
@@ -190,11 +227,14 @@ public class Escalonador{
     
     //cuidar
     private void noProcessPrint(){
-        do{
+        while(execTime < nextArrival){
             printProcess.add("-");
             printIO.add("X");
             execTime++;
-        }while(execTime < nextArrival);
+        }
+        printProcess.add("-");
+        printIO.add("X");
+        noMultiContext = true;
         // testing shit
         System.out.println();
         System.out.println(execTime);
@@ -222,6 +262,11 @@ public class Escalonador{
             for(int j = 0; j < procs[i].getIOTimeList().size(); j++) System.out.print(procs[i].getIOTimeList().get(j) + " ");
             System.out.println();
         }
+    }
+    
+    private void print(){
+        System.out.println();
+        for(int i = 0; i < printProcess.size(); i++) System.out.print(printProcess.get(i));
     }
         
     private void shutdown(){
