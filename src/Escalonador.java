@@ -18,12 +18,12 @@ import java.util.Collections;
 public class Escalonador{
 
     private Processo[] procs;
-    private int slice, nextArrival, execTime, recursionQuit;
+    private int slice, nextArrival, execTime, recursionQuit, IOExecutionTime;
     private boolean preemp = false, noMultiContext = false;
     private LinkedList<Integer> sortedArrivalTime, sortedIOTime;
     private LinkedList<String> printProcess, printIO;
     private LinkedList<Processo> availableProcess, roundRobinEffect;
-    private Processo currentProcess;
+    private Processo currentProcess, IOProcess;
 
     public Escalonador(){
         sortedArrivalTime = new LinkedList<>();
@@ -33,6 +33,7 @@ public class Escalonador{
         roundRobinEffect = new LinkedList<>();
         execTime = 1;
         currentProcess = null;
+        IOProcess = null;
     }
     
     // SE USAR RECURSÃO, APAGAR O SLICETIME DOS PROCESSOS!!!!**********************
@@ -124,9 +125,31 @@ public class Escalonador{
             
                 comparePriority();
                 if(preemp) runRepeat();
-                /*else if(!currentProcess.getIOTimeList().isEmpty()){
-                //ver tempo que foi executado <=, getfirst, removefirst, quando entrar, retira e mete um run com o priority
-                }*/
+                else if(!currentProcess.getIOTimeList().isEmpty()){
+                    if(currentProcess.getExecutedTime() >= currentProcess.getIOTimeList().getFirst()){
+                        currentProcess.getIOTimeList().removeFirst();
+                        IOProcess = currentProcess;
+                        availableProcess.remove(currentProcess);
+                        currentProcess = null;
+                        printProcess.add("T");
+                        printIO.add("X");
+                        noMultiContext = false;
+                        if(nextArrival != -1 && execTime == nextArrival) searchProcess();
+                        execTime++;
+                        IOExecutionTime = 4;
+                        runRepeatIO();
+                        availableProcess.add(IOProcess);
+                        runRepeat();
+                    }
+                    else if(currentProcess.getSlice() == 0){
+                        currentProcess.fillSlice(slice);
+                        runRepeat();
+                    }
+                    else{
+                        runStep();
+                        runRepeat();
+                    }
+                }
                 else if(currentProcess.getSlice() == 0){
                     currentProcess.fillSlice(slice);
                     runRepeat();
@@ -156,13 +179,55 @@ public class Escalonador{
         }
     }
     
+    private void runRepeatIO(){
+        
+        if(IOExecutionTime == 0) return;
+        
+        if(!preemp){
+            if(!availableProcess.isEmpty()){
+            
+                comparePriority();
+                if(preemp) runRepeatIO();
+                else if(currentProcess.getSlice() == 0){
+                    currentProcess.fillSlice(slice);
+                    runRepeatIO();
+                }
+                else{
+                    runStep();
+                    runRepeatIO();
+                }
+            }
+            else{
+                noProcessPrintIO();
+                searchProcess();
+                execTime++;
+                runRepeatIO();
+            }
+        }
+        else{
+            if(noMultiContext){
+                printProcess.add("T");
+                printIO.add(IOProcess.getId());
+                if(nextArrival != -1 && execTime == nextArrival) searchProcess();
+                execTime++;
+                IOExecutionTime--;
+                noMultiContext = false;
+            }
+            preemp = false;
+            runRepeatIO();
+        }
+    }
+    
     private void runStep(){
         currentProcess.executeSecond();
         currentProcess.reduceSlice();
         printProcess.add(currentProcess.getId());
-        printIO.add("X");
+        if(IOExecutionTime > 0) {
+            printIO.add(IOProcess.getId());
+        }else printIO.add("X");
         if(nextArrival != -1 && execTime == nextArrival) searchProcess();
         execTime++;
+        if(IOExecutionTime > 0) IOExecutionTime--;
         noMultiContext = true;
         if(currentProcess.getExecutedTime() == currentProcess.getExecutionTime()){
             availableProcess.remove(currentProcess);
@@ -247,6 +312,16 @@ public class Escalonador{
         System.out.println(execTime);
     }
     
+    private void noProcessPrintIO(){
+        while(execTime < nextArrival || IOExecutionTime > 0){
+            printProcess.add("-");
+            printIO.add(IOProcess.getId());
+            execTime++;
+            IOExecutionTime--;
+        }
+        noMultiContext = true;
+    }
+    
     private void fillKeyLists(){
         for(int i = 0; i < procs.length; i++) sortedArrivalTime.add(procs[i].getArrivalTime());
         Collections.sort(sortedArrivalTime);
@@ -274,6 +349,16 @@ public class Escalonador{
     private void print(){
         System.out.println();
         for(int i = 0; i < printProcess.size(); i++) System.out.print(printProcess.get(i));
+        System.out.println();
+        for(int i = 0; i < printIO.size(); i++){
+            if(printIO.get(i).equals("X"))System.out.print(" ");
+            else System.out.print(printIO.get(i));
+        }
+        System.out.println();
+    }
+    
+    public void calculateMetrics(){
+        
     }
         
     private void shutdown(){
