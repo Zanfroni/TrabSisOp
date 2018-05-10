@@ -1,13 +1,17 @@
+package escalonalixo;
+
 import java.io.IOException;
 
 /**
  *
  * @author Gabriel Franzoni 15105090
  */
-public class App {
+public class Main {
     //Início da execução
     public static void main(String[] args) throws IOException {
-        Scheduler sch = new Scheduler();
+        Escalonador sch = new Escalonador();
+        sch.schRead();
+        sch.schExec();
     }
     
 }
