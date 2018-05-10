@@ -1,5 +1,3 @@
-package escalonalixo;
-
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -199,7 +197,7 @@ public class Escalonador{
             }
             else{
                 noProcessPrintIO();
-                searchProcess();
+                if(nextArrival != -1) searchProcess();
                 execTime++;
                 runRepeatIO();
             }
@@ -282,10 +280,13 @@ public class Escalonador{
             if(procs[i].getArrivalTime() == nextArrival){
                 availableProcess.add(procs[i]);
                 System.out.println("asdasdsadasd " + execTime + " " + nextArrival + " " + procs[i].getArrivalTime());
+                System.out.println("asdasdsadasd2 " + printProcess.size());
             }
         }
         //Remove duplicatas do tempo de chegada
         //Esta condição só é atingida quando não existir mais tempo de chegada, tornando nextArrival dispensável.
+        System.out.println("shitoel " + availableProcess.size() + " " + procs.length + " " + sortedArrivalTime.isEmpty());
+        System.out.println("shitoel2 " + printProcess.size());
         if(sortedArrivalTime.isEmpty() || availableProcess.size() == procs.length){
             nextArrival = -1;
             return;
@@ -358,7 +359,74 @@ public class Escalonador{
     }
     
     public void calculateMetrics(){
-        
+    	double sum = 0;
+    	System.out.println();
+    	System.out.println("RESULTADOS");
+    	System.out.println("==========");
+    	calculateWait(sum);
+        calculateAnswer(sum);
+        calculateTurnAround(sum);
+    }
+    
+    private void calculateWait(double sum){
+    	int distance = 0;
+    	for(int i = 0; i < procs.length; i++){
+    	    int nullTime = procs[i].getArrivalTime();
+    	    for(int j = 0; j < printProcess.size(); j++){
+    	    	if(nullTime <= 0){
+    	    	    //System.out.println("gesiel0 " + printProcess.size());
+    	    	    //System.out.println("gesiel1 " + printProcess.get(j));
+    	    	    //System.out.println("gesiel2 " + procs[i].getId());
+    	    	    if(!printProcess.get(j).equals(procs[i].getId())) distance++;
+    	    	    else{
+    	    	        sum += distance;
+    	                distance = 0;
+    	    	    }
+                }
+                nullTime--;
+    	    }
+    	}
+    	double result = (double)(sum/procs.length);
+    	System.out.println("Tempo de espera médio: " + String.valueOf(sum/procs.length));
+    }
+    
+    private void calculateAnswer(double sum){
+    	int distance = 0;
+    	for(int i = 0; i < procs.length; i++){
+    	    int nullTime = procs[i].getArrivalTime();
+    	    for(int j = 0; j < printProcess.size(); j++){
+    	        if(nullTime <= 0){
+    	            if(!printProcess.get(j).equals(procs[i].getId())) distance++;
+    	            else{
+    	                sum += distance;
+    	                distance = 0;
+    	                break;
+    	            }
+    	        }
+    	        nullTime--;
+    	    }
+    	}
+    	double result = (double)(sum/procs.length);
+    	System.out.println("Tempo de resposta médio: " + String.valueOf(sum/procs.length));
+    }
+    
+    private void calculateTurnAround(double sum){
+    	boolean first = true;
+    	int init = 0, last = 0;
+    	for(int i = 0; i < procs.length; i++){
+    	    for(int j = 0; j < printProcess.size(); j++){
+    	    	if(printProcess.get(j).equals(procs[i].getId())){
+    	    	    if(first){
+    	    	        init = j;
+    	    	        first = false;
+    	    	    }
+    	    	    last = j;
+    	    	}
+    	    }
+    	    sum += (last-init);
+    	}
+    	double result = (double)(sum/procs.length);
+    	System.out.println("Tempo de turn-around médio: " + String.valueOf(sum/procs.length));
     }
         
     private void shutdown(){

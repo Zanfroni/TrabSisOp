@@ -1,5 +1,3 @@
-package escalonalixo;
-
 import java.io.IOException;
 
 /**
@@ -12,6 +10,7 @@ public class Main {
         Escalonador sch = new Escalonador();
         sch.schRead();
         sch.schExec();
+        sch.calculateMetrics();
     }
     
 }

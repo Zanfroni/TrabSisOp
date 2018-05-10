@@ -1,5 +1,3 @@
-package escalonalixo;
-
 import java.util.LinkedList;
 import java.util.Collections;
 
