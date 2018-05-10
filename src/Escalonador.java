@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Collections;
+import java.util.Scanner;
 
 /**
  *
@@ -15,14 +16,15 @@ import java.util.Collections;
 
 public class Escalonador{
 
-    private Processo[] procs;
-    private int slice, nextArrival, execTime, recursionQuit, IOExecutionTime, restrict;
-    private boolean preemp = false, noMultiContext = false;
-    private LinkedList<Integer> sortedArrivalTime, sortedIOTime;
-    private LinkedList<String> printProcess, printIO;
-    private LinkedList<Processo> availableProcess, roundRobinEffect;
-    private Processo currentProcess, IOProcess;
+    private Processo[] procs; //Lista de todos os processos
+    private int slice, nextArrival, execTime, recursionQuit, IOExecutionTime, restrict; //Dados. recursionQuit e restrict servem para evitar loop infinito no código
+    private boolean preemp = false, noMultiContext = false; //Condicionais para execução (melhor demonstrados em ação)
+    private LinkedList<Integer> sortedArrivalTime; //Lista de TODOS os tempos de chegada ordenados
+    private LinkedList<String> printProcess, printIO; //Gráficos para serem impressos no final
+    private LinkedList<Processo> availableProcess, roundRobinEffect; //Listas auxiliares que analisam processos que podem ser executados/rodiziados
+    private Processo currentProcess, IOProcess; //Objetos de auxílio que servem como ponteiros que apontam para um processo
 
+    //Construtor
     public Escalonador(){
         sortedArrivalTime = new LinkedList<>();
         printProcess = new LinkedList<>();
@@ -35,11 +37,15 @@ public class Escalonador{
         IOProcess = null;
     }
     
-    // SE USAR RECURSÃO, APAGAR O SLICETIME DOS PROCESSOS!!!!**********************
-    
     //Método que faz leitura do arquivo texto e constrói o Escalonador e os Processos
     public void schRead() throws FileNotFoundException, IOException{
-    BufferedReader in = new BufferedReader(new FileReader("input.txt"));
+    
+    Scanner s = new Scanner(System.in);
+    System.out.println("Digite o nome do arquivo de entrada (sem extensão .txt)");
+    String enter = s.nextLine();
+    System.out.println();
+    System.out.println("====================================================================================");
+    BufferedReader in = new BufferedReader(new FileReader(enter + ".txt"));
         String line;
         int procCount = 0;
         
@@ -67,33 +73,37 @@ public class Escalonador{
                 }
                 if(procs[procCount].IORepetition()) shutdown(); //Verifica se não há repetição de entradas para IO
             }
-            procs[procCount].setPrintValue(procCount+1); //Número de identificação do processo
+            procs[procCount].setId(procCount+1); //Número de identificação do processo
             procCount++;
         }
         in.close();
-        printInput();
         
     }
     
+    // INÍCIO DO ESCALONAMENTO
     public void schExec(){
-    	//Ok, deve-se retirar o primeiro valor de chegada e primeiro valor de IO (se tudo for zero, cancela).
-    	//Procura o processo
-    	//Insere em AvailableProcess
-    	//Performa a recursão, troca de contexto toda vez. Ela é um while de "slice" vezes.
-    	//Quando o IO inicia (tem que estar no processo, pega o mais cedo da lista que disponibiliza e segue em diante)
-    	// 	*criar lógica de true e false que libera e sempre refazer quando entrar o próximo (ver se número repete)
-    	//Executa IO e dps da troca de contexto, reinsere a merda do processo de volta nos AvailableProcess e segue o baile.
-    	//	*nota-se que se n ter available mesmo tempo IO vai imprimir os "---", AND THAT'S EXACTLY WHAT I FUCKING NEED!!!
-    	// Fazer relatório enquanto estiver fazendo merda na PUCRS!!!
-        
+    
         fillKeyLists();
-        
-        nextArrival = sortedArrivalTime.removeFirst();
+        nextArrival = sortedArrivalTime.removeFirst(); //Pega o primeiro tempo de chegada
         
         //Inicia escalonamento
         runScheduler();
-        
     }
+    
+    // Métodos que cria e ordena lista de todos os tempos de chegada
+    private void fillKeyLists(){
+        for(int i = 0; i < procs.length; i++) sortedArrivalTime.add(procs[i].getArrivalTime());
+        Collections.sort(sortedArrivalTime);
+    }
+    
+    
+    
+    
+    //Daqui em diante, o Escalonamento é iniciadom onde runScheduler e runRepeat são os dois
+    //métodos principais para a execução
+    
+    //Toda vez que um novo nextArrival entrar, ele irá procurar o processo correspondente a ele
+    //com o método searchProcess(), que é bem importante na jogada deste algoritmo
     
     private void runScheduler(){
         //Execução padrão quando ninguém tem arrivalTime = 1
@@ -105,68 +115,75 @@ public class Escalonador{
         else{
             searchProcess();
             comparePriority();
-            //printProcess.add(currentProcess.getId());
-            //printIO.add("X");
             execTime++;
         }
         
         //Inicia a recursão
         runRepeat();
+        printInput();
         print();
     }
     
+    //RECURSÃO É FEITA AQUI (identação foi importante para localizar a ordem que é executado)
     private void runRepeat(){
         
+        //Acaba a recursão
         if(recursionQuit == 0) return;
         
+        //Se não existir preempção, ele pode continuar
         if(!preemp){
-            if(!availableProcess.isEmpty()){
+            if(!availableProcess.isEmpty()){ //Só continua se ter processo disponível na fila
             
-                comparePriority();
-                if(preemp) runRepeat();
-                else if(!currentProcess.getIOTimeList().isEmpty()){
+                comparePriority(); //Metódo que serve para estabelecer prioridades e oferecer o rodízio entre os processos de mesma prioridade
+                if(preemp) runRepeat(); //Se comparePriority executou operação com preempção, ele faz recursão
+                else if(!currentProcess.getIOTimeList().isEmpty()){ //Verifica se é hora de aplicar IO
                     if(currentProcess.getExecutedTime() >= currentProcess.getIOTimeList().getFirst()){
                         currentProcess.getIOTimeList().removeFirst();
                         IOProcess = currentProcess;
-                        availableProcess.remove(currentProcess);
+                        availableProcess.remove(currentProcess); //Quando entra em IO, o processo temporariamente sai da fila para executar seu IO e retorna no final
                         currentProcess = null;
                         printProcess.add("T");
                         printIO.add("X");
                         noMultiContext = false;
                         if(nextArrival != -1 && execTime == nextArrival) searchProcess();
-                        execTime++;
+                        //execTime++;
                         IOExecutionTime = 4;
-                        runRepeatIO();
+                        runRepeatIO(); //Aqui entra para outra recursão dentro desta, exclusiva para quando há IO (infelizmente, aconteceu redundâncias devido ao tratamento de IO)
                         availableProcess.add(IOProcess);
                         runRepeat();
                     }
-                    else if(currentProcess.getSlice() == 0){
+                    else if(currentProcess.getSlice() == 0){ //Isto confere se a vez do processo acabou em seu rodízio de prioridades
                         currentProcess.fillSlice(slice);
                         runRepeat();
                     }
-                    else{
+                    else{ //Executa normalmente um passo
                         runStep();
                         runRepeat();
                     }
                 }
-                else if(currentProcess.getSlice() == 0){
+                else if(currentProcess.getSlice() == 0){ //Isto confere se a vez do processo acabou em seu rodízio de prioridades (infeliz redundância)
                     currentProcess.fillSlice(slice);
                     runRepeat();
                 }
-                else{
+                else{ //Executa normalmente um passo (infeliz redundância)
                     runStep();
                     runRepeat();
                 }
             }
-            else{
+            else{ //Se não existir processo disponível, ele se desativa e volta a ativar quando um outro que ainda não chegou entrar na fila.
                 noProcessPrint();
                 searchProcess();
                 execTime++;
                 runRepeat();
             }
         }
+        
+        //Caso exista preempção (interrompeu um processo), entra aqui e verifica se deve inserir uma troca.
+        //A razão disto é que este algoritmo funciona duma forma que possa haver diversas trocas constantes
+        //dependendo da prioridade, então ele faz isto para evitar que ele fiquei imprimindo várias trocas
+        //uma depois de outra.
         else{
-            if(noMultiContext){
+            if(noMultiContext){ //noMultiContext evita que imprima duas trocas de contexto seguidas
                 printProcess.add("T");
                 printIO.add("X");
                 if(nextArrival != -1 && execTime == nextArrival) searchProcess();
@@ -178,11 +195,11 @@ public class Escalonador{
         }
     }
     
+    // Recursão dentro da recursão para processos IO. Infelizmente, é bastante semelhante à outra mas tem mudanças exclusivas em certas partes para aconchegar o IO.
+    // Nota-se que quando o IOExecutionTime (constante 4) zerar, ele volta pra recursão normal.
     private void runRepeatIO(){
         
         if(IOExecutionTime == 0) return;
-        
-        print();
         
         if(!preemp){
             if(!availableProcess.isEmpty()){
@@ -200,7 +217,7 @@ public class Escalonador{
             }
             else{
                 noProcessPrintIO();
-                if(nextArrival != -1) searchProcess();
+                if(nextArrival != -1 && execTime == nextArrival) searchProcess();
                 runRepeatIO();
             }
         }
@@ -217,27 +234,29 @@ public class Escalonador{
             runRepeatIO();
         }
     }
-    
-    private void runStep(){
-        currentProcess.executeSecond();
-        currentProcess.reduceSlice();
-        printProcess.add(currentProcess.getId());
-        if(IOExecutionTime > 0) {
-            printIO.add(IOProcess.getId());
-        }else printIO.add("X");
-        if(nextArrival != -1 && execTime == nextArrival) searchProcess();
-        execTime++;
-        if(IOExecutionTime > 0) IOExecutionTime--;
-        noMultiContext = true;
-        if(currentProcess.getExecutedTime() == currentProcess.getExecutionTime()){
-            availableProcess.remove(currentProcess);
-            currentProcess = null;
-            comparePriority();
-            preemp = true;
-            recursionQuit--;
+
+    //Método que procura o processo correspondente ao tempo de execução (compara com seu tempo de chegada)
+    private void searchProcess(){
+        for(int i = 0; i < procs.length; i++){
+            if(procs[i].getArrivalTime() == nextArrival){
+                availableProcess.add(procs[i]);
+                restrict++;
+            }
+        }
+        //Remove duplicatas do tempo de chegada
+        //Esta condição só é atingida quando não existir mais tempo de chegada, tornando nextArrival dispensável.
+        if(sortedArrivalTime.isEmpty() || availableProcess.size() == procs.length || restrict == procs.length){
+            nextArrival = -1;
+            return;
+        }
+        int oldArrival = nextArrival;
+        while(nextArrival == oldArrival){
+            nextArrival = sortedArrivalTime.removeFirst();
+            if(sortedArrivalTime.isEmpty()) return;
         }
     }
     
+    //Método que pega os processos com melhor prioridade e trata o rodízio dos mesmos
     private void comparePriority(){
         Processo oldProcess = currentProcess;
         int bestPriority = 9;
@@ -276,32 +295,28 @@ public class Escalonador{
         roundRobinEffect.clear();
     }
     
-    //se der uns exception, pode ser aqui o problema
-    private void searchProcess(){
-        for(int i = 0; i < procs.length; i++){
-            if(procs[i].getArrivalTime() == nextArrival){
-                availableProcess.add(procs[i]);
-                restrict++;
-                System.out.println("asdasdsadasd " + execTime + " " + nextArrival + " " + procs[i].getArrivalTime());
-                System.out.println("asdasdsadasd2 " + printProcess.size());
-            }
-        }
-        //Remove duplicatas do tempo de chegada
-        //Esta condição só é atingida quando não existir mais tempo de chegada, tornando nextArrival dispensável.
-        System.out.println("shitoel " + availableProcess.size() + " " + procs.length + " " + sortedArrivalTime.isEmpty());
-        System.out.println("shitoel2 " + printProcess.size());
-        if(sortedArrivalTime.isEmpty() || availableProcess.size() == procs.length || restrict == procs.length){
-            nextArrival = -1;
-            return;
-        }
-        int oldArrival = nextArrival;
-        while(nextArrival == oldArrival){
-            nextArrival = sortedArrivalTime.removeFirst();
-            if(sortedArrivalTime.isEmpty()) return;
+    //Método que executa um passo. Processa um segundo do processo atual (currentProcess)
+    private void runStep(){
+        currentProcess.executeSecond();
+        currentProcess.reduceSlice();
+        printProcess.add(currentProcess.getId());
+        if(IOExecutionTime > 0) {
+            printIO.add(IOProcess.getId());
+        }else printIO.add("X");
+        if(nextArrival != -1 && execTime == nextArrival) searchProcess();
+        execTime++;
+        if(IOExecutionTime > 0) IOExecutionTime--;
+        noMultiContext = true;
+        if(currentProcess.getExecutedTime() == currentProcess.getExecutionTime()){
+            availableProcess.remove(currentProcess);
+            currentProcess = null;
+            comparePriority();
+            preemp = true;
+            recursionQuit--;
         }
     }
     
-    //cuidar
+    //Método que imprime um traço (significando que não há processos)
     private void noProcessPrint(){
         while(execTime < nextArrival){
             printProcess.add("-");
@@ -316,30 +331,26 @@ public class Escalonador{
         System.out.println(execTime);
     }
     
+    //Versão para quando há IO (com mudanças). Provavelmente o método mais volátil do código
     private void noProcessPrintIO(){
         while(execTime < nextArrival || IOExecutionTime > 0){
+            if(IOExecutionTime <= 0) break;
             printProcess.add("-");
             printIO.add(IOProcess.getId());
-            execTime++;
+            execTime++;            
             IOExecutionTime--;
         }
         //if(IOExecutionTime == 0) availableProcess.add(IOProcess);
         noMultiContext = true;
     }
     
-    private void fillKeyLists(){
-        for(int i = 0; i < procs.length; i++) sortedArrivalTime.add(procs[i].getArrivalTime());
-        Collections.sort(sortedArrivalTime);
-        
-        //TESTING CRAP
-        System.out.println();
-        for(int i = 0; i < sortedArrivalTime.size(); i++) System.out.print(sortedArrivalTime.get(i) + " ");
-    }
     
+    
+    //Finalmente, segue os métodos de impressão e cálculo
     private void printInput(){
     //Impressão da entrada
-        System.out.println("Entrada:");
-        System.out.println("========");
+        System.out.println("ENTRADA");
+        System.out.println("=======");
         System.out.println(procs.length);
         System.out.println(slice);
         for(int i = 0; i < procs.length; i++){
@@ -353,6 +364,9 @@ public class Escalonador{
     
     private void print(){
         System.out.println();
+        System.out.println();
+        System.out.println("GRÁFICO");
+        System.out.println("=======");
         for(int i = 0; i < printProcess.size(); i++) System.out.print(printProcess.get(i));
         System.out.println();
         for(int i = 0; i < printIO.size(); i++){
@@ -370,6 +384,8 @@ public class Escalonador{
     	calculateWait(sum);
         calculateAnswer(sum);
         calculateTurnAround(sum);
+	System.out.println("====================================================================================");
+	System.out.println();
     }
     
     private void calculateWait(double sum){
@@ -378,9 +394,6 @@ public class Escalonador{
     	    int nullTime = procs[i].getArrivalTime();
     	    for(int j = 0; j < printProcess.size(); j++){
     	    	if(nullTime <= 0){
-    	    	    //System.out.println("gesiel0 " + printProcess.size());
-    	    	    //System.out.println("gesiel1 " + printProcess.get(j));
-    	    	    //System.out.println("gesiel2 " + procs[i].getId());
     	    	    if(!printProcess.get(j).equals(procs[i].getId())) distance++;
     	    	    else{
     	    	        sum += distance;
