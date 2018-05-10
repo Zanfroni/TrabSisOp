@@ -18,16 +18,19 @@ import java.util.Collections;
 public class Escalonador{
 
     private Processo[] procs;
-    private int slice, nextArrival, nextIO, execTime;
+    private int slice, nextArrival, execTime;
+    private boolean preemp = false;
     private LinkedList<Integer> sortedArrivalTime, sortedIOTime;
     private LinkedList<String> printProcess, printIO;
-    private LinkedList<Processo> availableProcess;
+    private LinkedList<Processo> availableProcess, roundRobinEffect;
+    private Processo currentProcess;
 
     public Escalonador(){
         sortedArrivalTime = new LinkedList<>();
         printProcess = new LinkedList<>();
         printIO = new LinkedList<>();
         availableProcess = new LinkedList<>();
+        roundRobinEffect = new LinkedList<>();
         execTime = 1;
     }
     
@@ -56,11 +59,12 @@ public class Escalonador{
             procs[procCount] = new Processo(slice, Integer.parseInt(info[0]), Integer.parseInt(info[1]), Integer.parseInt(info[2])); //Cria o processo
             if(info.length > 3){ //Verifica se existe processos IO e insere os tempos de IO no processo respectivo
             	for(int i = 3; i < info.length; i++){
-                    if(Integer.parseInt(info[i]) < 0 || Integer.parseInt(info[i]) > Integer.parseInt(info[1])) shutdown();
+                    if(Integer.parseInt(info[i]) < 0 || Integer.parseInt(info[i]) > Integer.parseInt(info[1])
+                            || Integer.parseInt(info[i]) == Integer.parseInt(info[1])) shutdown();
                     procs[procCount].insertIOTime(Integer.parseInt(info[i]));
                 }
+                if(procs[procCount].IORepetition()) shutdown(); //Verifica se não há repetição de entradas para IO
             }
-            //else procs[procCount].insertIOTime(0); SERÁ QUE REALMENTE PRECISA DISTO???
             procs[procCount].setPrintValue(procCount+1); //Número de identificação do processo
             procCount++;
         }
@@ -90,45 +94,80 @@ public class Escalonador{
     }
     
     private void runScheduler(){
-        if(execTime == nextIO) //searchIO();
+        //Execução padrão quando ninguém tem arrivalTime = 1
         if(execTime < nextArrival){
-            //Execução padrão quando ninguém tem arrivalTime = 1
             noProcessPrint();
-            execTime++;
             printProcess.add("T");
             printIO.add("X");
             searchProcess();
             execTime++;
         }
         
+        searchProcess();
         //Inicia a recursão
         runRepeat();
     }
     
     private void runRepeat(){
-        
-        /*
-        while(procCount != 0){
-            if(nextArrival == execTime) searchProcess();
-            if(nextIO == execTime) searchIO();
-            
-            if(avaliableProcess.isEmpty()){
-                noProcessPrint();
-                searchProcess();
-            }
+        if(!preemp){
             comparePriority();
-            
-            if(currentProcess.getIOLiberation()) executeIO();
+
+            if(!currentProcess.getIOTimeList().isEmpty()){
+           //ver tempo que foi executado <=
+            }
+            else if(currentProcess.getSlice() == 0){
+                currentProcess.fillSlice(slice);
+            }
             else{
-                if(!changeC) executeProcess();
-                else changeOfContext();
+                runStep();
             }
-            if(currentProcess.getExecution() == 0){
-                avaliableProcess.remove(currentProcess);
-                System.out.println("PASSEI "+ avaliableProcess.size());
-                procCount--;
+        }
+        else{
+            //executar a porra da troca
+        }
+    }
+    
+    private void runStep(){
+        
+    }
+    
+    private void comparePriority(){
+        Processo oldProcess = currentProcess;
+        int bestPriority = 9;
+        
+        //Insere todos os processos com a melhor prioridade atual em uma lista separada
+        for(int i = 0; i < availableProcess.size(); i++){
+            if(availableProcess.get(i).getPriority() < bestPriority){
+                bestPriority = availableProcess.get(i).getPriority();
             }
-        */
+        }
+        for(int i = 0; i < availableProcess.size(); i++){
+            if(availableProcess.get(i).getPriority() == bestPriority){
+                roundRobinEffect.add(availableProcess.get(i));
+            }
+        }
+        
+        //Ele faz o rodízio (Round Robin) pelas prioridades aqui
+        //Se todas estiverem falsas, ele reinicia o rodízio
+        int resetCondition = roundRobinEffect.size();
+        for(int i = 0; i < roundRobinEffect.size(); i++){
+            if(roundRobinEffect.get(i).getRR()){
+                currentProcess = roundRobinEffect.get(i);
+                if (oldProcess != currentProcess) preemp = true;
+                break;
+            }
+            resetCondition--;
+            if(resetCondition == 0){
+                for(int j = 0; j < roundRobinEffect.size(); j++){
+                    roundRobinEffect.get(j).desetRR();
+                }
+                //Se ele reiniciar o rodízio, ele parte de volta do primeiro valor
+                currentProcess = roundRobinEffect.get(0);
+            }
+        }
+        
+        //Limpa a lista auxiliar
+        roundRobinEffect.clear();
     }
     
     //se der uns exception, pode ser aqui o problema
@@ -149,12 +188,13 @@ public class Escalonador{
         }
     }
     
+    //cuidar
     private void noProcessPrint(){
-        while(execTime < nextArrival){
+        do{
             printProcess.add("-");
             printIO.add("X");
             execTime++;
-        }
+        }while(execTime < nextArrival);
         // testing shit
         System.out.println();
         System.out.println(execTime);

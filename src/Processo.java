@@ -1,7 +1,7 @@
 package escalonalixo;
 
-import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.Collections;
 
 /**
  *
@@ -10,11 +10,12 @@ import java.util.LinkedList;
 public class Processo {
 
     private String id;
-    private int arrivalTime, executionTime, priority, refresh, executedTime; //refresh talvez caia fora
+    private int arrivalTime, executionTime, priority, sliceTime, executedTime;
+    private boolean roundRobin = true;
     private LinkedList<Integer> IOTimeList;
 
-    public Processo(int refresh, int arrivalTime, int executionTime, int priority){
-    	this.refresh = refresh;
+    public Processo(int sliceTime, int arrivalTime, int executionTime, int priority){
+    	this.sliceTime = sliceTime;
     	this.arrivalTime = arrivalTime;
     	this.executionTime = executionTime;
     	this.priority = priority;
@@ -24,6 +25,14 @@ public class Processo {
     
     public void insertIOTime(int n){
     	IOTimeList.add(n);
+        Collections.sort(IOTimeList);
+    }
+    
+    public boolean IORepetition(){
+        for(int i = 0; i < IOTimeList.size()-1; i++){
+            if(IOTimeList.get(i) == IOTimeList.get(i+1)) return true;
+        }
+        return false;
     }
     
     public void setPrintValue(int n){
@@ -52,5 +61,26 @@ public class Processo {
     
     public LinkedList<Integer> getIOTimeList(){
         return IOTimeList;
+    }
+    
+    public void fillSlice(int n){
+        sliceTime = n;
+        setRR();
+    }
+    
+    public int getSlice(){
+        return sliceTime;
+    }
+    
+    private void setRR(){
+        roundRobin = false;
+    }
+    
+    public void desetRR(){
+        roundRobin = true;
+    }
+    
+    public boolean getRR(){
+        return roundRobin;
     }
 }
